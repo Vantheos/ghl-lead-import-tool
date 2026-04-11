@@ -35,13 +35,10 @@ export function remapCsv(fileArrayBuffer, originalFilename) {
   // Build issues CSV only when there are discrepancies
   let issuesCsv = null
   if (inMappingNotInFile.length > 0 || inFileNotInMapping.length > 0) {
-    const issueRows = [['Issue', 'Column Name']]
-
-    for (const col of inMappingNotInFile) {
-      issueRows.push(['In mapping table — not found in uploaded file', col])
-    }
-    for (const col of inFileNotInMapping) {
-      issueRows.push(['In uploaded file — not in mapping table (passed through)', col])
+    const rowCount = Math.max(inMappingNotInFile.length, inFileNotInMapping.length)
+    const issueRows = [['Missing From Upload', 'Mapping Not Required']]
+    for (let i = 0; i < rowCount; i++) {
+      issueRows.push([inMappingNotInFile[i] ?? '', inFileNotInMapping[i] ?? ''])
     }
 
     const issuesSheet = XLSX.utils.aoa_to_sheet(issueRows)
