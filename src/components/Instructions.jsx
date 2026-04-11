@@ -1,7 +1,7 @@
 export default function Instructions() {
   return (
     <div className="bg-[#191E27] rounded-xl p-6 space-y-5">
-      <h1 className="text-2xl font-bold text-white">GHL Lead Import Tool For Turbomock Lead Lists</h1>
+      <h1 className="text-2xl font-bold text-white">Turbomock Lead List Remapping Tool For GHL Import</h1>
 
       <ol className="space-y-2 text-gray-300 list-decimal list-inside">
         <li>
