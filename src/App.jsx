@@ -43,28 +43,16 @@ export default function App() {
           </div>
         )}
 
-        {result?.error === 'missing_columns' && (
-          <div className="bg-[#191E27] border border-[#D97126]/40 rounded-xl p-5">
-            <p className="font-semibold text-[#D97126]">
-              Missing required columns ({result.missing.length})
-            </p>
-            <p className="text-sm mt-1 text-gray-300">
-              Add the missing columns to your file and re-upload when ready.
-            </p>
-            <ul className="mt-3 space-y-1">
-              {result.missing.map(col => (
-                <li key={col}>
-                  <code className="text-sm text-[#D97126] bg-[#0C121D] px-1.5 py-0.5 rounded">
-                    {col}
-                  </code>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
         {result?.csv && (
           <DownloadButton csv={result.csv} filename={result.filename} />
+        )}
+
+        {result?.issuesCsv && (
+          <DownloadButton
+            csv={result.issuesCsv}
+            filename={result.issuesFilename}
+            variant="warning"
+          />
         )}
 
         <MappingTable />

@@ -11,14 +11,15 @@ export function remapCsv(fileArrayBuffer, originalFilename) {
   }
 
   const headers = rows[0]
+  const mappingKeys = Object.keys(mapping)
 
-  // Abort if any required mapping key is missing from the file's headers
-  const missingColumns = Object.keys(mapping).filter(key => !headers.includes(key))
-  if (missingColumns.length > 0) {
-    return { error: 'missing_columns', missing: missingColumns }
-  }
+  // Columns expected by mapping but absent from the file
+  const inMappingNotInFile = mappingKeys.filter(key => !headers.includes(key))
 
-  // Remap headers in place — unmapped columns pass through unchanged
+  // Columns in the file that have no mapping entry (will pass through unchanged)
+  const inFileNotInMapping = headers.filter(h => !mappingKeys.includes(h))
+
+  // Remap headers — unmapped columns pass through unchanged
   const newHeaders = headers.map(h => mapping[h] ?? h)
   const newRows = [newHeaders, ...rows.slice(1)]
 
@@ -31,5 +32,25 @@ export function remapCsv(fileArrayBuffer, originalFilename) {
     ? `${originalFilename.slice(0, dotIndex)}_GHL_ready${originalFilename.slice(dotIndex)}`
     : `${originalFilename}_GHL_ready.csv`
 
-  return { csv: csvOutput, filename: outputFilename }
+  // Build issues CSV only when there are discrepancies
+  let issuesCsv = null
+  if (inMappingNotInFile.length > 0 || inFileNotInMapping.length > 0) {
+    const issueRows = [['Issue', 'Column Name']]
+
+    for (const col of inMappingNotInFile) {
+      issueRows.push(['In mapping table — not found in uploaded file', col])
+    }
+    for (const col of inFileNotInMapping) {
+      issueRows.push(['In uploaded file — not in mapping table (passed through)', col])
+    }
+
+    const issuesSheet = XLSX.utils.aoa_to_sheet(issueRows)
+    issuesCsv = XLSX.utils.sheet_to_csv(issuesSheet)
+  }
+
+  return {
+    csv: csvOutput,
+    filename: outputFilename,
+    ...(issuesCsv ? { issuesCsv, issuesFilename: 'Mapping_Issues.csv' } : {}),
+  }
 }
