@@ -51,6 +51,11 @@ export function remapCsv(fileArrayBuffer, originalFilename) {
   return {
     csv: csvOutput,
     filename: outputFilename,
-    ...(issuesCsv ? { issuesCsv, issuesFilename: 'Mapping_Issues.csv' } : {}),
+    ...(issuesCsv ? {
+      issuesCsv,
+      issuesFilename: 'Mapping_Issues.csv',
+      inMappingNotInFile,
+      inFileNotInMapping,
+    } : {}),
   }
 }
