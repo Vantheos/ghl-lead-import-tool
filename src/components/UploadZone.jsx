@@ -36,7 +36,7 @@ export default function UploadZone({ onFile, onReset }) {
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
         className={`
-          relative border-2 border-dashed rounded-xl p-14 text-center cursor-pointer transition-all
+          relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all
           ${isDragging
             ? 'border-[#3B8CCF] bg-[#3B8CCF]/10'
             : 'border-white/20 bg-[#191E27] hover:border-[#3B8CCF]/60 hover:bg-[#191E27]/80'
@@ -52,7 +52,7 @@ export default function UploadZone({ onFile, onReset }) {
         />
         <div className="space-y-3">
           <svg
-            className="mx-auto h-10 w-10 text-gray-500"
+            className="mx-auto h-7 w-7 text-gray-500"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

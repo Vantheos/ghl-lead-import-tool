@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Header from './components/Header.jsx'
 import Instructions from './components/Instructions.jsx'
+import MappingTable from './components/MappingTable.jsx'
 import UploadZone from './components/UploadZone.jsx'
 import DownloadButton from './components/DownloadButton.jsx'
 import { remapCsv } from './utils/remapCsv.js'
@@ -28,7 +29,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0C121D] text-white">
-      <div className="max-w-4xl mx-auto px-4 py-10 space-y-6">
+      <div className="max-w-4xl mx-auto px-4 py-4 space-y-4">
         <Header />
         <Instructions />
         <UploadZone onFile={handleFile} onReset={handleReset} />
@@ -65,6 +66,8 @@ export default function App() {
         {result?.csv && (
           <DownloadButton csv={result.csv} filename={result.filename} />
         )}
+
+        <MappingTable />
       </div>
     </div>
   )
