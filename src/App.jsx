@@ -88,7 +88,7 @@ export default function App() {
 
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  In uploaded file — not in mapping ({result.inFileNotInMapping.length})
+                  Removed from original ({result.inFileNotInMapping.length})
                 </p>
                 {result.inFileNotInMapping.length === 0
                   ? <p className="text-xs text-gray-600 italic">None</p>

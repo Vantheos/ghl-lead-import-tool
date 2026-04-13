@@ -16,12 +16,20 @@ export function remapCsv(fileArrayBuffer, originalFilename) {
   // Columns expected by mapping but absent from the file
   const inMappingNotInFile = mappingKeys.filter(key => !headers.includes(key))
 
-  // Columns in the file that have no mapping entry (will pass through unchanged)
+  // Columns in the file that have no mapping entry — will be removed from output
   const inFileNotInMapping = headers.filter(h => !mappingKeys.includes(h))
 
-  // Remap headers — unmapped columns pass through unchanged
-  const newHeaders = headers.map(h => mapping[h] ?? h)
-  const newRows = [newHeaders, ...rows.slice(1)]
+  // Only keep columns that exist in the mapping; remap their headers
+  const mappedIndices = headers.reduce((acc, h, i) => {
+    if (mapping[h] !== undefined) acc.push(i)
+    return acc
+  }, [])
+
+  const newHeaders = mappedIndices.map(i => mapping[headers[i]])
+  const newRows = [
+    newHeaders,
+    ...rows.slice(1).map(row => mappedIndices.map(i => row[i] ?? '')),
+  ]
 
   const newSheet = XLSX.utils.aoa_to_sheet(newRows)
   const csvOutput = XLSX.utils.sheet_to_csv(newSheet)
@@ -32,15 +40,10 @@ export function remapCsv(fileArrayBuffer, originalFilename) {
     ? `${originalFilename.slice(0, dotIndex)}_GHL_ready${originalFilename.slice(dotIndex)}`
     : `${originalFilename}_GHL_ready.csv`
 
-  // Build issues CSV only when there are discrepancies
+  // Build issues CSV when there are any discrepancies
   let issuesCsv = null
   if (inMappingNotInFile.length > 0 || inFileNotInMapping.length > 0) {
-    const rowCount = Math.max(inMappingNotInFile.length, inFileNotInMapping.length)
-    const issueRows = [['Missing From Upload', 'Mapping Not Required']]
-    for (let i = 0; i < rowCount; i++) {
-      issueRows.push([inMappingNotInFile[i] ?? '', inFileNotInMapping[i] ?? ''])
-    }
-
+    const issueRows = [['Removed From Original'], ...inFileNotInMapping.map(col => [col])]
     const issuesSheet = XLSX.utils.aoa_to_sheet(issueRows)
     issuesCsv = XLSX.utils.sheet_to_csv(issuesSheet)
   }

@@ -17,7 +17,7 @@ export default function Instructions() {
       </ol>
 
       <p className="text-sm text-gray-400">
-        Any columns not listed in the mapping table below will be passed through to the output file unchanged.
+        Any columns that could not be mapped will be removed from the output file.
       </p>
     </div>
   )
