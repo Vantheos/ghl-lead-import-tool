@@ -1,6 +1,7 @@
 {
   "name": "Business Name",
   "site": "Website",
+  "website": "Website",
   "category": "Category",
   "type": "Business Type",
   "phone": "Phone",
