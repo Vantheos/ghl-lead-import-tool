@@ -43,7 +43,7 @@ export default function App() {
           </div>
         )}
 
-        {result?.csv && (
+        {result?.filename && (
           <DownloadButton csv={result.csv} filename={result.filename} />
         )}
 
