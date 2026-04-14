@@ -4,6 +4,7 @@ import Instructions from './components/Instructions.jsx'
 import MappingTable from './components/MappingTable.jsx'
 import UploadZone from './components/UploadZone.jsx'
 import DownloadButton from './components/DownloadButton.jsx'
+import SplitDownload from './components/SplitDownload.jsx'
 import { remapCsv } from './utils/remapCsv.js'
 
 export default function App() {
@@ -45,6 +46,10 @@ export default function App() {
 
         {result?.filename && (
           <DownloadButton csv={result.csv} filename={result.filename} />
+        )}
+
+        {result?.filename && (
+          <SplitDownload csv={result.csv} filename={result.filename} />
         )}
 
         <MappingTable />
