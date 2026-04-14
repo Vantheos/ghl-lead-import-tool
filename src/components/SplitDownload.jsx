@@ -32,7 +32,7 @@ export default function SplitDownload({ csv, filename }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-4 flex-wrap">
+      <div className="flex items-center justify-center gap-4 flex-wrap">
         <label className="flex items-center gap-3 cursor-pointer select-none">
           <input
             type="checkbox"
