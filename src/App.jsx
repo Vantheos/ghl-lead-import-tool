@@ -47,66 +47,6 @@ export default function App() {
           <DownloadButton csv={result.csv} filename={result.filename} />
         )}
 
-        {result?.issuesCsv && (
-          <div className="bg-[#191E27] border border-[#D97126]/40 rounded-xl p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-[#D97126]">Mapping discrepancies found</p>
-              <button
-                onClick={() => {
-                  const blob = new Blob([result.issuesCsv], { type: 'text/csv;charset=utf-8;' })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = result.issuesFilename
-                  a.click()
-                  URL.revokeObjectURL(url)
-                }}
-                className="bg-[#D97126] hover:bg-[#c0621f] text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-              >
-                Download Mapping_Issues.csv
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  In mapping — not in uploaded file ({result.inMappingNotInFile.length})
-                </p>
-                {result.inMappingNotInFile.length === 0
-                  ? <p className="text-xs text-gray-600 italic">None</p>
-                  : <ul className="space-y-1">
-                      {result.inMappingNotInFile.map(col => (
-                        <li key={col}>
-                          <code className="text-xs text-[#D97126] bg-[#0C121D] px-1.5 py-0.5 rounded">
-                            {col}
-                          </code>
-                        </li>
-                      ))}
-                    </ul>
-                }
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  Removed from original ({result.inFileNotInMapping.length})
-                </p>
-                {result.inFileNotInMapping.length === 0
-                  ? <p className="text-xs text-gray-600 italic">None</p>
-                  : <ul className="space-y-1">
-                      {result.inFileNotInMapping.map(col => (
-                        <li key={col}>
-                          <code className="text-xs text-gray-400 bg-[#0C121D] px-1.5 py-0.5 rounded">
-                            {col}
-                          </code>
-                        </li>
-                      ))}
-                    </ul>
-                }
-              </div>
-            </div>
-          </div>
-        )}
-
         <MappingTable />
       </div>
     </div>
