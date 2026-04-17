@@ -1,0 +1,9 @@
+{
+  "street_address": "Street Address",
+  "zip": "Postal Code",
+  "phone_1": "Phone",
+  "email_from_website": "Email",
+  "first_category": "Category",
+  "reviews_count": "Reviews",
+  "average_rating": "Rating"
+}

@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx'
 import mapping from '../mapping.json'
+import hiddenMapping from '../hiddenMapping.json'
 
 export function remapCsv(fileArrayBuffer, originalFilename) {
   const workbook = XLSX.read(fileArrayBuffer, { type: 'array' })
@@ -11,21 +12,22 @@ export function remapCsv(fileArrayBuffer, originalFilename) {
   }
 
   const headers = rows[0]
-  const mappingKeys = Object.keys(mapping)
 
-  // Columns expected by mapping but absent from the file
-  const inMappingNotInFile = mappingKeys.filter(key => !headers.includes(key))
+  // Merge visible and hidden mappings into a single case-insensitive lookup
+  const allMappings = { ...mapping, ...hiddenMapping }
+  const lookupMap = Object.fromEntries(
+    Object.entries(allMappings).map(([k, v]) => [k.toLowerCase(), v])
+  )
 
-  // Columns in the file that have no mapping entry — will be removed from output
-  const inFileNotInMapping = headers.filter(h => !mappingKeys.includes(h))
+  const getRemapped = (header) => lookupMap[String(header).toLowerCase()]
 
-  // Only keep columns that exist in the mapping; remap their headers
+  // Only keep columns that have a mapping entry (case-insensitive match)
   const mappedIndices = headers.reduce((acc, h, i) => {
-    if (mapping[h] !== undefined) acc.push(i)
+    if (getRemapped(h) !== undefined) acc.push(i)
     return acc
   }, [])
 
-  const newHeaders = mappedIndices.map(i => mapping[headers[i]])
+  const newHeaders = mappedIndices.map(i => getRemapped(headers[i]))
   const newRows = [
     newHeaders,
     ...rows.slice(1).map(row => mappedIndices.map(i => row[i] ?? '')),
@@ -40,9 +42,11 @@ export function remapCsv(fileArrayBuffer, originalFilename) {
     ? `${originalFilename.slice(0, dotIndex)}_GHL_ready${originalFilename.slice(dotIndex)}`
     : `${originalFilename}_GHL_ready.csv`
 
-  // Build issues CSV when there are any discrepancies
+  // Track columns removed from the original (not matched by any mapping)
+  const inFileNotInMapping = headers.filter(h => getRemapped(h) === undefined)
+
   let issuesCsv = null
-  if (inMappingNotInFile.length > 0 || inFileNotInMapping.length > 0) {
+  if (inFileNotInMapping.length > 0) {
     const issueRows = [['Removed From Original'], ...inFileNotInMapping.map(col => [col])]
     const issuesSheet = XLSX.utils.aoa_to_sheet(issueRows)
     issuesCsv = XLSX.utils.sheet_to_csv(issuesSheet)
@@ -51,11 +55,6 @@ export function remapCsv(fileArrayBuffer, originalFilename) {
   return {
     csv: csvOutput,
     filename: outputFilename,
-    ...(issuesCsv ? {
-      issuesCsv,
-      issuesFilename: 'Mapping_Issues.csv',
-      inMappingNotInFile,
-      inFileNotInMapping,
-    } : {}),
+    ...(issuesCsv ? { issuesCsv, issuesFilename: 'Mapping_Issues.csv' } : {}),
   }
 }
