@@ -114,9 +114,21 @@ Root component managing two pieces of state:
 
 ## Deployment
 
-Deployed via Vercel's GitHub integration. Every push to `main` on `Vantheos/ghl-lead-import-tool` triggers an automatic build and deployment. No manual deploy step required.
+Deployed via Vercel's GitHub integration. Every push to `main` on `Vantheos/ghl-lead-import-tool` triggers an automatic build and deployment to production. Pushes to feature branches produce Vercel preview deployments at unique URLs — useful for spot-checking before merging.
 
-The GitHub MCP (connected to the Vantheos account) is used to push file changes directly from Claude Code without needing local git credentials.
+---
+
+## Development Workflow (Claude Code)
+
+This project is developed entirely through Claude Code via the GitHub MCP. **There is no local clone in active use.** The repo on GitHub is the single source of truth, and Claude reads, writes, and commits files directly through MCP calls.
+
+**Conventions:**
+
+- **No local working tree.** Don't `git clone`, don't try to edit files at `D:/Dev/ghl-lead-import-tool` — any local copy is stale and divergent. All file operations go through `mcp__github__*` tools.
+- **Feature work goes on a feature branch.** Branch from `main` (naming: `feat/<short-slug>` or `fix/<short-slug>`), commit changes there, then merge to `main` when verified. Vercel auto-deploys the branch as a preview URL during development.
+- **`main` is reserved for production-ready commits.** Direct pushes to `main` are acceptable only for tiny mechanical changes (typo fixes, mapping JSON additions, doc tweaks) where a preview adds no value.
+- **Plans live in `~/.claude/plans/`** (per-session, not in the repo). When picking up mid-feature work, reference the plan file path explicitly so the next session can resume from the same intent.
+- **Vercel MCP** is connected to `ops@vantheos.com` / Vantheos team — useful for inspecting deployments, env vars, and logs without leaving Claude.
 
 ---
 
