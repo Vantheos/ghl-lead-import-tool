@@ -2,7 +2,7 @@
 
 ## Overview
 
-A client-side single-page application (SPA) hosted on Vercel that processes Turbomock lead list CSV files for bulk import into GoHighLevel (GHL). All processing happens in the browser — no backend, no server, no data is ever uploaded anywhere.
+A single-page application (SPA) hosted on Vercel that processes Turbomock lead list CSV files for bulk import into GoHighLevel (GHL). Remap and split happen in the browser. The optional **Import** action runs on a Vercel Function so the GHL Private Integration Token can stay server-side; only the function ever sees the token. The Import button is hidden behind a passphrase, so anonymous visitors can use the remap/split flow without ever touching the import path.
 
 **Live URL:** https://ghl-lead-import-tool.vercel.app
 
@@ -17,6 +17,7 @@ A client-side single-page application (SPA) hosted on Vercel that processes Turb
 3. Any columns that cannot be mapped are removed from the output
 4. The remapped file is offered for download as `[original_filename]_GHL_ready.csv`
 5. Optionally, the output can be split into smaller files of N leads each, packaged into a ZIP
+6. Optionally (passphrase-gated, owner only), each split chunk can be imported directly into the configured GHL sub-account with a fixed tag applied to every contact
 
 ---
 
@@ -29,6 +30,7 @@ A client-side single-page application (SPA) hosted on Vercel that processes Turb
 | Tailwind CSS | Styling |
 | SheetJS (`xlsx`) | CSV parsing and generation |
 | fflate | Client-side ZIP generation for split file feature |
+| Vercel Functions (Node 24, Fluid Compute) | Server-side import endpoints (`api/unlock`, `api/import`) |
 
 **Colours:**
 - Background: `#0C121D`
@@ -42,6 +44,9 @@ A client-side single-page application (SPA) hosted on Vercel that processes Turb
 
 ```
 ghl-lead-import-tool/
+├── api/
+│   ├── unlock.js                     # POST /api/unlock — validates passphrase
+│   └── import.js                     # POST /api/import — pushes contacts to GHL
 ├── index.html                        # Entry point; references V-only favicon
 ├── package.json                      # Dependencies: react, xlsx, fflate, tailwind, vite
 ├── vite.config.js                    # Vite + React plugin config
@@ -61,11 +66,11 @@ ghl-lead-import-tool/
     │   ├── Instructions.jsx          # Title, instructions, note about unmapped columns
     │   ├── UploadZone.jsx            # Drag-and-drop / click-to-browse CSV uploader
     │   ├── DownloadButton.jsx        # Reusable download card (blue styling)
-    │   ├── SplitDownload.jsx         # Optional split-to-ZIP feature UI
+    │   ├── SplitDownload.jsx         # Split-to-ZIP UI + per-file list with Download/Import + unlock gate
     │   └── MappingTable.jsx          # Column mapping reference table (visible mappings only)
     └── utils/
         ├── remapCsv.js               # Core processing logic
-        └── splitCsv.js               # CSV chunking and ZIP generation
+        └── splitCsv.js               # CSV chunking and ZIP generation (returns parts array)
 ```
 
 ---
@@ -91,13 +96,19 @@ Handles the optional split feature:
 - Takes the remapped CSV string and a leads-per-file count
 - Splits data rows into sequential chunks, each with the header row prepended
 - Packages all chunks into a ZIP using fflate's `zipSync`
+- Also returns `parts: [{filename, csv, leadCount}]` so the UI can render and act on each chunk individually
 - File naming pattern: `[base]_part_01_500leads.csv`, `_part_02_500leads.csv`, etc.
-- Returns a Blob, ZIP filename, and part count
 
 ### `src/App.jsx`
 Root component managing two pieces of state:
 - `result` — output of `remapCsv()` after a file is processed (null until a file is uploaded)
 - Renders: Header → Instructions → UploadZone → (on result) DownloadButton + SplitDownload → MappingTable
+
+### `api/unlock.js`
+Validates the user's passphrase against `GHL_IMPORT_PASSWORD`. Returns `200 {ok:true}` on match, `401 {ok:false}` (with a 400 ms delay) otherwise. Used by the SplitDownload UI to confirm the passphrase before revealing per-row Import buttons.
+
+### `api/import.js`
+Receives an array of contact objects from the browser, validates the `X-Import-Auth` header against `GHL_IMPORT_PASSWORD`, then POSTs each contact to `https://services.leadconnectorhq.com/contacts/` with the configured tag inline. Concurrency is limited to 5 to stay under GHL's per-location rate limit. Returns `{ ok, total, created, errors }`.
 
 ---
 
@@ -109,6 +120,21 @@ Root component managing two pieces of state:
 | Column name matches a hidden mapping key (any case) | Same — renamed, not visible in reference table |
 | Column name has no match in either mapping | Column is **removed** from output |
 | Two source columns map to the same GHL field | Both are renamed; both appear in output |
+
+---
+
+## Server-side function — environment variables
+
+The import path requires four env vars set on the Vercel project:
+
+| Var | Purpose |
+|---|---|
+| `GHL_API_TOKEN` | GHL Private Integration Token. Required scope: "View, Edit, and Delete Contacts" (`contacts.write`). Tags applied inline during create are covered by this same scope. |
+| `GHL_LOCATION_ID` | The Location/Sub-Account ID for the target sub-account. |
+| `GHL_IMPORT_TAG` | The tag string stamped on every imported contact (e.g. `Turbomock-Import`). |
+| `GHL_IMPORT_PASSWORD` | The passphrase that unlocks Import in the UI. Sent on every `/api/import` call as the `X-Import-Auth` header; validated against this var server-side. |
+
+Without these set, the function returns `500` ("Server not configured") or `401` ("Unauthorized"). The remap/split flow continues to work with no env vars at all — those features remain pure client-side.
 
 ---
 
@@ -134,6 +160,7 @@ This project is developed entirely through Claude Code via the GitHub MCP. **The
 
 ## Notes
 
-- The tool is entirely client-side. No data leaves the browser.
+- Remap and split are pure client-side; no data leaves the browser for those flows.
+- Import (passphrase-gated) routes contact data through the Vercel Function — the GHL API token never touches the browser.
 - The `.claude/launch.json` file configures the local dev server for previewing within Claude Code (`npm run dev` on port 5173).
 - `node_modules/` and `dist/` are gitignored.
