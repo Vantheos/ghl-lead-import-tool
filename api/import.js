@@ -1,3 +1,30 @@
+// Translates the human-readable column headers produced by remapCsv.js
+// (e.g. "Business Name", "Phone", "Street Address") into the camelCase
+// keys the GHL Create Contact API expects. Anything not in this map is
+// dropped — those fields would need to be sent as customFields (by ID),
+// which is a follow-up.
+const FIELD_MAP = {
+  'Business Name': 'companyName',
+  'Company Name':  'companyName',
+  'First Name':    'firstName',
+  'Last Name':     'lastName',
+  'Name':          'name',
+  'Email':         'email',
+  'Phone':         'phone',
+  'Website':       'website',
+  'Street Address':'address1',
+  'Address':       'address1',
+  'Address Line 2':'address2',
+  'City':          'city',
+  'State':         'state',
+  'Country':       'country',
+  'Postal Code':   'postalCode',
+  'Zip':           'postalCode',
+  'Timezone':      'timezone',
+  'Date of Birth': 'dateOfBirth',
+  'Source':        'source',
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -19,13 +46,21 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'contacts array required' })
   }
 
+  // Translate once up-front and collect dropped column names so we can report them
+  const translated = contacts.map(translateContact)
+  const droppedHeaders = new Set()
+  translated.forEach(t => t.dropped.forEach(k => droppedHeaders.add(k)))
+  if (droppedHeaders.size > 0) {
+    console.info('[import] Dropped headers (not in FIELD_MAP):', [...droppedHeaders])
+  }
+
   // Concurrency 5 to stay under GHL rate limit (100 req / 10 s per location)
   const CONCURRENCY = 5
   const results = []
-  for (let i = 0; i < contacts.length; i += CONCURRENCY) {
-    const batch = contacts.slice(i, i + CONCURRENCY)
+  for (let i = 0; i < translated.length; i += CONCURRENCY) {
+    const batch = translated.slice(i, i + CONCURRENCY)
     const settled = await Promise.allSettled(
-      batch.map(c => createContact(c, { token, locationId, tag }))
+      batch.map(t => createContact(t.body, { token, locationId, tag }))
     )
     settled.forEach((r, idx) => {
       results.push({
@@ -44,12 +79,32 @@ export default async function handler(req, res) {
     total: contacts.length,
     created,
     errors,
+    droppedHeaders: [...droppedHeaders],
   })
 }
 
-async function createContact(contact, { token, locationId, tag }) {
-  const existingTags = Array.isArray(contact.tags) ? contact.tags : []
-  const body = { ...contact, locationId, tags: [...existingTags, tag] }
+function translateContact(raw) {
+  const body = {}
+  const dropped = []
+  for (const [key, value] of Object.entries(raw)) {
+    if (value === '' || value == null) continue
+    const apiKey = FIELD_MAP[key]
+    if (apiKey) {
+      body[apiKey] = String(value)
+    } else {
+      dropped.push(key)
+    }
+  }
+  // GHL display works better when `name` is set. If we have companyName but no
+  // first/last/name, mirror companyName into name so the contact list shows it.
+  if (!body.name && !body.firstName && !body.lastName && body.companyName) {
+    body.name = body.companyName
+  }
+  return { body, dropped }
+}
+
+async function createContact(contactBody, { token, locationId, tag }) {
+  const body = { ...contactBody, locationId, tags: [tag] }
 
   const r = await fetch('https://services.leadconnectorhq.com/contacts/', {
     method: 'POST',
