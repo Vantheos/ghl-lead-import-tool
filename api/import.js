@@ -195,12 +195,6 @@ function translateContact(raw, customFieldMap) {
 
   if (customFields.length > 0) body.customFields = customFields
 
-  // GHL contact list display falls back to first/last/name. Mirror companyName
-  // into `name` when nothing else is present so the contact isn't blank.
-  if (!body.name && !body.firstName && !body.lastName && body.companyName) {
-    body.name = body.companyName
-  }
-
   return { body, dropped, unmappedCountry }
 }
 
