@@ -25,6 +25,63 @@ const FIELD_MAP = {
   'Source':        'source',
 }
 
+// GHL's country field requires an ISO 3166-1 alpha-2 code (e.g. "US", not "United States").
+// Map the common variants we see in Turbomock exports. If we can't normalize,
+// the country gets dropped (so the rest of the contact still imports).
+const COUNTRY_NAME_TO_ISO = {
+  'UNITED STATES': 'US',
+  'UNITED STATES OF AMERICA': 'US',
+  'USA': 'US',
+  'U.S.A.': 'US',
+  'U.S.': 'US',
+  'AMERICA': 'US',
+  'CANADA': 'CA',
+  'UNITED KINGDOM': 'GB',
+  'UK': 'GB',
+  'GREAT BRITAIN': 'GB',
+  'ENGLAND': 'GB',
+  'SCOTLAND': 'GB',
+  'WALES': 'GB',
+  'AUSTRALIA': 'AU',
+  'NEW ZEALAND': 'NZ',
+  'IRELAND': 'IE',
+  'GERMANY': 'DE',
+  'FRANCE': 'FR',
+  'SPAIN': 'ES',
+  'ITALY': 'IT',
+  'PORTUGAL': 'PT',
+  'NETHERLANDS': 'NL',
+  'BELGIUM': 'BE',
+  'SWITZERLAND': 'CH',
+  'AUSTRIA': 'AT',
+  'SWEDEN': 'SE',
+  'NORWAY': 'NO',
+  'DENMARK': 'DK',
+  'FINLAND': 'FI',
+  'POLAND': 'PL',
+  'MEXICO': 'MX',
+  'BRAZIL': 'BR',
+  'ARGENTINA': 'AR',
+  'CHILE': 'CL',
+  'COLOMBIA': 'CO',
+  'JAPAN': 'JP',
+  'CHINA': 'CN',
+  'INDIA': 'IN',
+  'SINGAPORE': 'SG',
+  'PHILIPPINES': 'PH',
+  'SOUTH AFRICA': 'ZA',
+  'UAE': 'AE',
+  'UNITED ARAB EMIRATES': 'AE',
+}
+
+function normalizeCountry(value) {
+  if (value == null || value === '') return null
+  const v = String(value).trim()
+  // Already a 2-letter code? Pass through uppercased.
+  if (/^[A-Za-z]{2}$/.test(v)) return v.toUpperCase()
+  return COUNTRY_NAME_TO_ISO[v.toUpperCase()] || null
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -49,9 +106,16 @@ export default async function handler(req, res) {
   // Translate once up-front and collect dropped column names so we can report them
   const translated = contacts.map(translateContact)
   const droppedHeaders = new Set()
-  translated.forEach(t => t.dropped.forEach(k => droppedHeaders.add(k)))
+  const unmappedCountries = new Set()
+  translated.forEach(t => {
+    t.dropped.forEach(k => droppedHeaders.add(k))
+    if (t.unmappedCountry) unmappedCountries.add(t.unmappedCountry)
+  })
   if (droppedHeaders.size > 0) {
     console.info('[import] Dropped headers (not in FIELD_MAP):', [...droppedHeaders])
+  }
+  if (unmappedCountries.size > 0) {
+    console.info('[import] Country values dropped (not in COUNTRY_NAME_TO_ISO):', [...unmappedCountries])
   }
 
   // Concurrency 5 to stay under GHL rate limit (100 req / 10 s per location)
@@ -80,27 +144,41 @@ export default async function handler(req, res) {
     created,
     errors,
     droppedHeaders: [...droppedHeaders],
+    unmappedCountries: [...unmappedCountries],
   })
 }
 
 function translateContact(raw) {
   const body = {}
   const dropped = []
+  let unmappedCountry = null
+
   for (const [key, value] of Object.entries(raw)) {
     if (value === '' || value == null) continue
     const apiKey = FIELD_MAP[key]
-    if (apiKey) {
-      body[apiKey] = String(value)
-    } else {
+    if (!apiKey) {
       dropped.push(key)
+      continue
     }
+    if (apiKey === 'country') {
+      const iso = normalizeCountry(value)
+      if (iso) {
+        body.country = iso
+      } else {
+        unmappedCountry = String(value)
+      }
+      continue
+    }
+    body[apiKey] = String(value)
   }
+
   // GHL display works better when `name` is set. If we have companyName but no
   // first/last/name, mirror companyName into name so the contact list shows it.
   if (!body.name && !body.firstName && !body.lastName && body.companyName) {
     body.name = body.companyName
   }
-  return { body, dropped }
+
+  return { body, dropped, unmappedCountry }
 }
 
 async function createContact(contactBody, { token, locationId, tag }) {
