@@ -263,7 +263,7 @@ export default function SplitDownload({ csv, filename }) {
                   {unlocked && !isComplete && !isImporting && (
                     <button
                       onClick={() => handleImport(part)}
-                      className="bg-[#059669] hover:bg-[#047857] text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
+                      className="bg-[#047857] hover:bg-[#065F46] text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
                     >
                       Import
                     </button>
@@ -271,7 +271,7 @@ export default function SplitDownload({ csv, filename }) {
                   {unlocked && isImporting && (
                     <button
                       disabled
-                      className="bg-[#059669]/50 text-white/70 font-semibold px-4 py-2 rounded-lg text-sm cursor-not-allowed"
+                      className="bg-[#047857]/50 text-white/70 font-semibold px-4 py-2 rounded-lg text-sm cursor-not-allowed"
                     >
                       Importing…
                     </button>
