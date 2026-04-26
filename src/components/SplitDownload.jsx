@@ -27,7 +27,8 @@ function buildErrorCsvBlob(part, errors) {
     .filter(Boolean)
   const outAoa = [[...headers, 'Import Error'], ...failedRows]
   const outSheet = XLSX.utils.aoa_to_sheet(outAoa)
-  const csv = XLSX.utils.sheet_to_csv(outSheet)
+  // Leading ﻿ (UTF-8 BOM) so Excel opens the file as UTF-8 instead of cp1252.
+  const csv = '﻿' + XLSX.utils.sheet_to_csv(outSheet)
   return new Blob([csv], { type: 'text/csv;charset=utf-8;' })
 }
 
