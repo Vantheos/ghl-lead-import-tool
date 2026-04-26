@@ -18,6 +18,7 @@ A single-page application (SPA) hosted on Vercel that processes Turbomock lead l
 4. The remapped file is offered for download as `[original_filename]_GHL_ready.csv`
 5. Optionally, the output can be split into smaller files of N leads each, packaged into a ZIP
 6. Optionally (passphrase-gated, owner only), each split chunk can be imported directly into the configured GHL sub-account with a fixed tag applied to every contact
+7. If an import returns partial failures, the row exposes a **Download** button that exports a `<chunk>_errors.csv` file containing only the failed contacts plus an `Import Error` column explaining each rejection
 
 ---
 
@@ -36,7 +37,8 @@ A single-page application (SPA) hosted on Vercel that processes Turbomock lead l
 - Background: `#0C121D`
 - Surface: `#191E27`
 - Blue (primary): `#3B8CCF`
-- Orange (warning): `#D97126`
+- Emerald (Import action): `#047857`
+- Burnt orange (warning text + error-CSV download): `#D97126`
 
 ---
 
@@ -66,7 +68,7 @@ ghl-lead-import-tool/
     │   ├── Instructions.jsx          # Title, instructions, note about unmapped columns
     │   ├── UploadZone.jsx            # Drag-and-drop / click-to-browse CSV uploader
     │   ├── DownloadButton.jsx        # Reusable download card (blue styling)
-    │   ├── SplitDownload.jsx         # Split-to-ZIP UI + per-file list with Download/Import + unlock gate
+    │   ├── SplitDownload.jsx         # Split-to-ZIP UI + per-file list with Download/Import + unlock gate + error-CSV export
     │   └── MappingTable.jsx          # Column mapping reference table (visible mappings only)
     └── utils/
         ├── remapCsv.js               # Core processing logic
@@ -108,7 +110,7 @@ Root component managing two pieces of state:
 Validates the user's passphrase against `GHL_IMPORT_PASSWORD`. Returns `200 {ok:true}` on match, `401 {ok:false}` (with a 400 ms delay) otherwise. Used by the SplitDownload UI to confirm the passphrase before revealing per-row Import buttons.
 
 ### `api/import.js`
-Receives an array of contact objects from the browser, validates the `X-Import-Auth` header against `GHL_IMPORT_PASSWORD`, then POSTs each contact to `https://services.leadconnectorhq.com/contacts/` with the configured tag inline. Concurrency is limited to 5 to stay under GHL's per-location rate limit. Returns `{ ok, total, created, errors }`.
+Receives an array of contact objects from the browser, validates the `X-Import-Auth` header against `GHL_IMPORT_PASSWORD`, then POSTs each contact to `https://services.leadconnectorhq.com/contacts/` with the configured tag inline. Concurrency is limited to 5 to stay under GHL's per-location rate limit. Returns `{ ok, total, created, errors, droppedHeaders, unmappedCountries, customFieldsLoaded, customFieldFetchError }`. Per-row error entries carry `{ row, action: 'error', error }` where `row` is the 0-indexed position in the submitted `contacts` array (the header row is excluded by the client-side parser) and `error` is the raw `HTTP <status>: <body>` string truncated to 200 chars.
 
 ---
 
@@ -123,13 +125,26 @@ Receives an array of contact objects from the browser, validates the `X-Import-A
 
 ---
 
+## Import Error Handling
+
+When `/api/import` returns one or more entries in `errors`, the affected row's status text shows `⚠ N new, M errors` and a burnt-orange **Download** button appears in the slot the Import button used to occupy. Clicking it produces `<chunk>_errors.csv` — the original headers + only the failed rows + a new `Import Error` column on the right.
+
+The error column is built client-side by extracting `"message"` and (when present) `"matchingField"` from the raw GHL error string via regex. Regex is used instead of `JSON.parse` because the server truncates GHL responses to 200 chars (often mid-traceId), which breaks JSON parsing but leaves both target fields intact since they appear before the truncation point. Output format:
+- With matching field: `This location does not allow duplicated contacts. — phone`
+- Without: `Contacts without email, phone, firstName and lastName are not allowed.`
+- Fallback (no `"message":` substring found): the raw error string is preserved unchanged
+
+The CSV is prefixed with a UTF-8 BOM so Excel opens it as UTF-8 and renders the em-dash (and any non-ASCII lead data) correctly instead of as Windows-1252 mojibake.
+
+---
+
 ## Server-side function — environment variables
 
 The import path requires four env vars set on the Vercel project:
 
 | Var | Purpose |
 |---|---|
-| `GHL_API_TOKEN` | GHL Private Integration Token. Required scope: "View, Edit, and Delete Contacts" (`contacts.write`). Tags applied inline during create are covered by this same scope. |
+| `GHL_API_TOKEN` | GHL Private Integration Token. Required scopes: "View, Edit, and Delete Contacts" (`contacts.write`) and "View Custom Fields" (`locations/customFields.readonly`) — the latter is needed for the runtime UUID lookup that routes unknown headers to contact custom fields by name. Tags applied inline during create are covered by `contacts.write`. |
 | `GHL_LOCATION_ID` | The Location/Sub-Account ID for the target sub-account. |
 | `GHL_IMPORT_TAG` | The tag string stamped on every imported contact (e.g. `Turbomock-Import`). |
 | `GHL_IMPORT_PASSWORD` | The passphrase that unlocks Import in the UI. Sent on every `/api/import` call as the `X-Import-Auth` header; validated against this var server-side. |
@@ -162,5 +177,6 @@ This project is developed entirely through Claude Code via the GitHub MCP. **The
 
 - Remap and split are pure client-side; no data leaves the browser for those flows.
 - Import (passphrase-gated) routes contact data through the Vercel Function — the GHL API token never touches the browser.
+- The error-CSV export is also pure client-side: it re-parses the chunk CSV that's already in component state and slices it by `errors[].row` index. No additional server round-trip.
 - The `.claude/launch.json` file configures the local dev server for previewing within Claude Code (`npm run dev` on port 5173).
 - `node_modules/` and `dist/` are gitignored.
