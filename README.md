@@ -8,7 +8,7 @@ A web app that takes Turbomock lead-list CSV exports, remaps the column headers 
 
 - **Remap** — drag in a Turbomock CSV; the tool renames columns case-insensitively to the GHL field names defined in [src/mapping.json](src/mapping.json) and [src/hiddenMapping.json](src/hiddenMapping.json), and drops anything unmapped. Output downloads as `<original>_GHL_ready.csv`.
 - **Split** — optionally break the output into chunks of N leads per file (e.g. 500), bundled into a ZIP.
-- **Per-file list** — a checkbox renders each chunk individually with **Download** and **Import** buttons.
+- **Per-file list** — a checkbox renders each chunk individually with **Download** and **Import** buttons. When an import has partial failures, an extra **Download** button appears that exports just the failed rows with an `Import Error` column appended explaining each rejection (GHL message + `matchingField` for duplicates).
 - **Import** (passphrase-gated, owner only) — pushes each chunk's contacts into a fixed GHL sub-account via a Vercel Function. Standard fields go to GHL's typed columns; everything else routes to matching contact custom fields by name. Every imported contact gets a fixed tag stamped on it.
 
 ## Stack
