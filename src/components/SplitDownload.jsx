@@ -2,6 +2,36 @@ import { useState } from 'react'
 import * as XLSX from 'xlsx'
 import { splitCsv } from '../utils/splitCsv.js'
 
+function formatErrorMessage(rawError) {
+  if (typeof rawError !== 'string') return String(rawError ?? '')
+  // Regex (not JSON.parse) — the server truncates GHL error bodies to 200 chars,
+  // often mid-traceId, so the JSON is frequently unterminated.
+  const msgMatch = rawError.match(/"message":"([^"]*)"/)
+  if (!msgMatch) return rawError
+  const fieldMatch = rawError.match(/"matchingField":"([^"]*)"/)
+  return fieldMatch ? `${msgMatch[1]} — ${fieldMatch[1]}` : msgMatch[1]
+}
+
+function buildErrorCsvBlob(part, errors) {
+  const wb = XLSX.read(part.csv, { type: 'string' })
+  const sheet = wb.Sheets[wb.SheetNames[0]]
+  const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+  const headers = aoa[0] || []
+  const dataRows = aoa.slice(1)
+  const failedRows = errors
+    .map(e => {
+      const original = dataRows[e.row]
+      if (!original) return null
+      return [...original, formatErrorMessage(e.error)]
+    })
+    .filter(Boolean)
+  const outAoa = [[...headers, 'Import Error'], ...failedRows]
+  const outSheet = XLSX.utils.aoa_to_sheet(outAoa)
+  // Leading ﻿ (UTF-8 BOM) so Excel opens the file as UTF-8 instead of cp1252.
+  const csv = '﻿' + XLSX.utils.sheet_to_csv(outSheet)
+  return new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+}
+
 export default function SplitDownload({ csv, filename }) {
   const [enabled, setEnabled] = useState(false)
   const [leadsPerFile, setLeadsPerFile] = useState(500)
@@ -52,6 +82,18 @@ export default function SplitDownload({ csv, filename }) {
     const a = document.createElement('a')
     a.href = url
     a.download = part.filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleDownloadErrors(part) {
+    const status = importState[part.filename]
+    if (!status?.errors?.length) return
+    const blob = buildErrorCsvBlob(part, status.errors)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = part.filename.replace(/\.csv$/i, '_errors.csv')
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -277,13 +319,23 @@ export default function SplitDownload({ csv, filename }) {
                     </button>
                   )}
                   {unlocked && isComplete && (
-                    <span
-                      className={`text-sm font-medium px-2 ${isSuccess ? 'text-[#3B8CCF]' : 'text-[#D97126]'}`}
-                    >
-                      {isSuccess
-                        ? `✓ ${status.created} new`
-                        : `⚠ ${status.created || 0} new, ${status.errors?.length || 0} errors — see console`}
-                    </span>
+                    <>
+                      <span
+                        className={`text-sm font-medium px-2 ${isSuccess ? 'text-[#3B8CCF]' : 'text-[#D97126]'}`}
+                      >
+                        {isSuccess
+                          ? `✓ ${status.created} new`
+                          : `⚠ ${status.created || 0} new, ${status.errors?.length || 0} errors`}
+                      </span>
+                      {!isSuccess && status.errors?.length > 0 && (
+                        <button
+                          onClick={() => handleDownloadErrors(part)}
+                          className="bg-[#D97126] hover:bg-[#B85A1F] text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
+                        >
+                          Download
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
