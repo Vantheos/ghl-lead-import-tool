@@ -4,16 +4,12 @@ import { splitCsv } from '../utils/splitCsv.js'
 
 function formatErrorMessage(rawError) {
   if (typeof rawError !== 'string') return String(rawError ?? '')
-  const jsonStart = rawError.indexOf('{')
-  if (jsonStart === -1) return rawError
-  try {
-    const parsed = JSON.parse(rawError.slice(jsonStart))
-    const msg = parsed.message || rawError
-    const field = parsed.meta?.matchingField
-    return field ? `${msg} — ${field}` : msg
-  } catch {
-    return rawError
-  }
+  // Regex (not JSON.parse) — the server truncates GHL error bodies to 200 chars,
+  // often mid-traceId, so the JSON is frequently unterminated.
+  const msgMatch = rawError.match(/"message":"([^"]*)"/)
+  if (!msgMatch) return rawError
+  const fieldMatch = rawError.match(/"matchingField":"([^"]*)"/)
+  return fieldMatch ? `${msgMatch[1]} — ${fieldMatch[1]}` : msgMatch[1]
 }
 
 function buildErrorCsvBlob(part, errors) {
